@@ -1,5 +1,5 @@
 import numpy as np
-from MatTrans import MatOp
+from MatOp import MatOp
 
 # define constants
 PI_OVER_2 = np.pi / 2
@@ -41,12 +41,10 @@ class IkSolver:
         # use trig identity to solve
         a = z_06 - z_03
         b = x_06 - x_03
-        c = d4
-        d = a3 
-        theta3_1 = np.atan2(a*d - b*c, a*c + b*d)
-        
-        print(f"theta3_1: {np.rad2deg(theta3_1)}")
-        return np.rad2deg(theta3_1)
+        c = a3 
+        d = d4
+        theta3 = -np.atan2(a*d - b*c, a*c + b*d)
+        return theta3
 
     def __solve_theta_4(self, R:np.ndarray, theta5:float) -> float:
         # rename variables for readability
@@ -55,8 +53,7 @@ class IkSolver:
         r21 = R[1, 0]
         theta4 = np.arctan2(r22/-s5, r21/s5)
 
-        print(f"theta4: {np.rad2deg(theta4)}")
-        return np.rad2deg(theta4)
+        return theta4
 
     def __solve_theta_5(self, R:np.ndarray, theta3:float) -> float:
         # rename variables for readability
@@ -68,7 +65,6 @@ class IkSolver:
         b = r13*c3 - r33*s3
         theta5 = np.arctan2(b, np.sqrt(1 - b**2))
 
-        print(f"theta5: {np.rad2deg(theta5)}")
         return theta5
 
     def __solve_theta_6(self, R:np.ndarray, theta5:float) -> float:
@@ -79,7 +75,6 @@ class IkSolver:
 
         # solve for theta_6
         theta6 = np.arctan2(r33/s5, r13/-s5)
-        print(f"theta6: {np.rad2deg(theta6)}")
         return theta6
 
     def solve_ik(self, *args) -> list:
@@ -114,7 +109,7 @@ class IkSolver:
 
         P, R = self.__get_wrist_from_tooltip(P, R)
         theta3 = self.__solve_theta3(P)
-        theta5 = self.__solve_theta_5(R, theta3)
+        theta5 = self.__solve_theta_5(R, -theta3)
         theta4 = self.__solve_theta_4(R, theta5)
         theta6 = self.__solve_theta_6(R, theta5)
         return [theta3, theta4, theta5, theta6]

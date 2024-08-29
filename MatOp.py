@@ -54,3 +54,7 @@ class MatOp:
         T_inv[0:3, 0:3] = R.T
         T_inv[0:3, 3] = -R.T @ P
         return T_inv
+
+    @staticmethod
+    def wrap_angle(angle):
+        return (angle + np.pi) % (2 * np.pi) - np.pi
