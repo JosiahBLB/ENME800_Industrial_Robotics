@@ -27,76 +27,24 @@ class IkSolver:
         R = T_06[0:3, 0:3]
         return P, R
 
-    def __solve_theta3(self, P: np.ndarray, R: np.ndarray) -> float:
+    def __solve_theta3(self, P: np.ndarray) -> float:
         # rename variables for readability
         a1 = self.a_i_minus_1[1]
         a2 = self.a_i_minus_1[2]
         a3 = self.a_i_minus_1[3]
         d1 = self.d_i[0]
         d4 = self.d_i[3]
-        d_tool = self.d_i[-1]
-        r13 = R[0, 2]
-        r33 = R[2, 2]
-        px = P[0]
-        pz = P[2]
+        x_03 = a1
+        z_03 = d1 + a2
+        x_06 = P[0]
+        z_06 = P[2]
 
-        # taken from matlab output
-        theta3 = np.atan2(
-            (
-                a2 * d4
-                - a1 * a3
-                + d1 * d4
-                + a3 * px
-                - d4 * pz
-                - a3 * d_tool * r13
-                + d4 * d_tool * r33
-            )
-            / (
-                a1**2
-                + 2 * a1 * d_tool * r13
-                - 2 * a1 * px
-                + a2**2
-                + 2 * a2 * d1
-                + 2 * a2 * d_tool * r33
-                - 2 * a2 * pz
-                + d1**2
-                + 2 * d1 * d_tool * r33
-                - 2 * d1 * pz
-                + d_tool**2 * r13**2
-                + d_tool**2 * r33**2
-                - 2 * d_tool * px * r13
-                - 2 * d_tool * pz * r33
-                + px**2
-                + pz**2
-            ),
-            -(
-                a2 * a3
-                + a3 * d1
-                + a1 * d4
-                - a3 * pz
-                - d4 * px
-                + a3 * d_tool * r33
-                + d4 * d_tool * r13
-            )
-            / (
-                a1**2
-                + 2 * a1 * d_tool * r13
-                - 2 * a1 * px
-                + a2**2
-                + 2 * a2 * d1
-                + 2 * a2 * d_tool * r33
-                - 2 * a2 * pz
-                + d1**2
-                + 2 * d1 * d_tool * r33
-                - 2 * d1 * pz
-                + d_tool**2 * r13**2
-                + d_tool**2 * r33**2
-                - 2 * d_tool * px * r13
-                - 2 * d_tool * pz * r33
-                + px**2
-                + pz**2
-            ),
-        )
+        # use trig identity to solve
+        a = z_06 - z_03
+        b = x_06 - x_03
+        c = a3 
+        d = d4
+        theta3 = -np.atan2(a*d - b*c, a*c + b*d)
 
         return theta3
 
@@ -172,8 +120,8 @@ class IkSolver:
             raise ValueError("Invalid number of arguments provided.")
 
         P, R = self.__get_wrist_from_tooltip(P, R)
-        theta3 = self.__solve_theta3(P, R)
-        theta5_1, theta5_2 = self.__solve_theta_5(R, theta3)
-        theta4 = self.__solve_theta_4(R, theta3, theta5_1)
-        theta6 = self.__solve_theta_6(R, theta3, theta5_1)
-        return [theta3, theta4, theta5_1, theta6]
+        theta3 = self.__solve_theta3(P)
+        theta5 = self.__solve_theta_5(R, theta3)
+        theta4 = self.__solve_theta_4(R, theta3, theta5)
+        theta6 = self.__solve_theta_6(R, theta3, theta5)
+        return [theta3, theta4, theta5, theta6]

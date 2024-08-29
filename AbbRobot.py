@@ -58,7 +58,6 @@ class AbbRobot:
 
     def move_to_angles(self, theta_i):
         if dh_matrices := self.fk_solver.solve_fk(theta_i):
-            DH_06 = reduce(lambda a, b: a @ b, dh_matrices).round(3)
             theta_i = [MatOp.wrap_angle(theta) for theta in theta_i]
             theta_i = [round(float(theta), 3) for theta in theta_i]
             self.__print_final_results(theta_i, dh_matrices)
