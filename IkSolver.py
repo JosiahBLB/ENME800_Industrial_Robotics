@@ -4,13 +4,16 @@ from MatOp import MatOp
 # define constants
 PI_OVER_2 = np.pi / 2
 
+
 class IkSolver:
     def __init__(self, dh_table) -> None:
         self.a_i_minus_1 = dh_table[0]
         self.alpha_i_minus_1 = dh_table[1]
         self.d_i = dh_table[2]
 
-    def __get_wrist_from_tooltip(self, P:np.ndarray, R:np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def __get_wrist_from_tooltip(
+        self, P: np.ndarray, R: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
         T_0T = np.eye(4)
         T_0T[0:3, 0:3] = R
         T_0T[0:3, 3] = P
@@ -24,57 +27,118 @@ class IkSolver:
         R = T_06[0:3, 0:3]
         return P, R
 
-    def __solve_theta3(self, P:np.ndarray) -> float:
+    def __solve_theta3(self, P: np.ndarray, R: np.ndarray) -> float:
         # rename variables for readability
         a1 = self.a_i_minus_1[1]
         a2 = self.a_i_minus_1[2]
         a3 = self.a_i_minus_1[3]
         d1 = self.d_i[0]
         d4 = self.d_i[3]
+        d_tool = self.d_i[-1]
+        r13 = R[0, 2]
+        r33 = R[2, 2]
+        px = P[0]
+        pz = P[2]
 
-        # prep equation 
-        x_03 = a1
-        z_03 = d1 + a2
-        x_06 = P[0]
-        z_06 = P[2]
+        # taken from matlab output
+        theta3 = np.atan2(
+            (
+                a2 * d4
+                - a1 * a3
+                + d1 * d4
+                + a3 * px
+                - d4 * pz
+                - a3 * d_tool * r13
+                + d4 * d_tool * r33
+            )
+            / (
+                a1**2
+                + 2 * a1 * d_tool * r13
+                - 2 * a1 * px
+                + a2**2
+                + 2 * a2 * d1
+                + 2 * a2 * d_tool * r33
+                - 2 * a2 * pz
+                + d1**2
+                + 2 * d1 * d_tool * r33
+                - 2 * d1 * pz
+                + d_tool**2 * r13**2
+                + d_tool**2 * r33**2
+                - 2 * d_tool * px * r13
+                - 2 * d_tool * pz * r33
+                + px**2
+                + pz**2
+            ),
+            -(
+                a2 * a3
+                + a3 * d1
+                + a1 * d4
+                - a3 * pz
+                - d4 * px
+                + a3 * d_tool * r33
+                + d4 * d_tool * r13
+            )
+            / (
+                a1**2
+                + 2 * a1 * d_tool * r13
+                - 2 * a1 * px
+                + a2**2
+                + 2 * a2 * d1
+                + 2 * a2 * d_tool * r33
+                - 2 * a2 * pz
+                + d1**2
+                + 2 * d1 * d_tool * r33
+                - 2 * d1 * pz
+                + d_tool**2 * r13**2
+                + d_tool**2 * r33**2
+                - 2 * d_tool * px * r13
+                - 2 * d_tool * pz * r33
+                + px**2
+                + pz**2
+            ),
+        )
 
-        # use trig identity to solve
-        a = z_06 - z_03
-        b = x_06 - x_03
-        c = a3 
-        d = d4
-        theta3 = -np.atan2(a*d - b*c, a*c + b*d)
         return theta3
 
-    def __solve_theta_4(self, R:np.ndarray, theta5:float) -> float:
+    def __solve_theta_4(
+        self, R: np.ndarray, theta3: np.ndarray, theta5: float
+    ) -> float:
         # rename variables for readability
         s5 = np.sin(theta5)
-        r22 = R[1, 1]
-        r21 = R[1, 0]
-        theta4 = np.arctan2(r22/-s5, r21/s5)
-
-        return theta4
-
-    def __solve_theta_5(self, R:np.ndarray, theta3:float) -> float:
-        # rename variables for readability
-        r13 = R[0, 2]
-        r33 = R[2, 2]
-
         c3 = np.cos(theta3)
         s3 = np.sin(theta3)
-        b = r13*c3 - r33*s3
-        theta5 = np.arctan2(b, np.sqrt(1 - b**2))
+        r_33 = R[2, 2]
+        r_13 = R[0, 2]
+        r_23 = R[1, 2]
 
-        return theta5
+        # solve for theta_4
+        theta4 = np.atan2(-(r_33 * c3 + r_13 * s3) / s5, r_23 / s5)
+        return theta4
 
-    def __solve_theta_6(self, R:np.ndarray, theta5:float) -> float:
+    def __solve_theta_5(self, R: np.ndarray, theta3: float) -> tuple[float]:
         # rename variables for readability
         r13 = R[0, 2]
         r33 = R[2, 2]
+        r23 = R[1, 2]
+        c3 = np.cos(theta3)
+        s3 = np.sin(theta3)
+
+        # solve for theta_5
+        theta5 = np.atan2(np.sqrt((r33*c3 + r13*s3)**2 + r23**2), r13*c3 - r33*s3)
+        return theta5
+
+    def __solve_theta_6(self, R: np.ndarray, theta3: float, theta5: float) -> float:
+        # rename variables for readability
+        r_12 = R[0, 1]
+        r_32 = R[2, 1]
+        r_11 = R[0, 0]
+        r_31 = R[2, 0]
         s5 = np.sin(theta5)
+        c3 = np.cos(theta3)
+        s3 = np.sin(theta3)
 
         # solve for theta_6
-        theta6 = np.arctan2(r33/s5, r13/-s5)
+        theta6 = np.atan2(-(r_12 * c3 - r_32 * s3) / s5, (r_11 * c3 - r_31 * s3) / s5)
         return theta6
 
     def solve_ik(self, *args) -> list:
@@ -108,8 +172,8 @@ class IkSolver:
             raise ValueError("Invalid number of arguments provided.")
 
         P, R = self.__get_wrist_from_tooltip(P, R)
-        theta3 = self.__solve_theta3(P)
-        theta5 = self.__solve_theta_5(R, -theta3)
-        theta4 = self.__solve_theta_4(R, theta5)
-        theta6 = self.__solve_theta_6(R, theta5)
-        return [theta3, theta4, theta5, theta6]
+        theta3 = self.__solve_theta3(P, R)
+        theta5_1, theta5_2 = self.__solve_theta_5(R, theta3)
+        theta4 = self.__solve_theta_4(R, theta3, theta5_1)
+        theta6 = self.__solve_theta_6(R, theta3, theta5_1)
+        return [theta3, theta4, theta5_1, theta6]
