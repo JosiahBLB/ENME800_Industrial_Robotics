@@ -27,66 +27,84 @@ class IkSolver:
         R = T_06[0:3, 0:3]
         return P, R
 
-    def __solve_theta3(self, P: np.ndarray) -> float:
+    def __solve_theta3(self, P: np.ndarray, R: np.ndarray) -> float:
         # rename variables for readability
         a1 = self.a_i_minus_1[1]
         a2 = self.a_i_minus_1[2]
         a3 = self.a_i_minus_1[3]
         d1 = self.d_i[0]
         d4 = self.d_i[3]
-        x_03 = a1
-        z_03 = d1 + a2
-        x_06 = P[0]
-        z_06 = P[2]
+        dt = self.d_i[-1]
+        px = P[0]
+        pz = P[2]
+        r33 = R[2, 2]
+        r13 = R[0, 2]
 
-        # use trig identity to solve
-        a = z_06 - z_03
-        b = x_06 - x_03
-        c = a3 
-        d = d4
-        theta3 = -np.atan2(a*d - b*c, a*c + b*d)
+        # solve for theta_3 using trig identity
+        theta3 = np.atan2(
+            a3 * (a2 + d1 - pz + dt * r33) - d4 * (a1 - px + dt * r13),
+            -a3 * (a1 - px + dt * r13) - d4 * (a2 + d1 - pz + dt * r33),
+        )
+        print(f"theta3: {theta3}")
+
+        theta3 = np.atan2(
+            d4 * (a2 + d1 - pz + dt * r33) - a3 * (a1 - px + dt * r13),
+            -d4 * (a1 - px + dt * r13) - a3 * (a2 + d1 - pz + dt * r33),
+        )
+        print(f"theta3: {theta3}")
 
         return theta3
 
-    def __solve_theta_4(
-        self, R: np.ndarray, theta3: np.ndarray, theta5: float
-    ) -> float:
+    def __solve_theta_4(self, R: np.ndarray, theta3: np.ndarray) -> float:
         # rename variables for readability
-        s5 = np.sin(theta5)
         c3 = np.cos(theta3)
         s3 = np.sin(theta3)
-        r_33 = R[2, 2]
-        r_13 = R[0, 2]
+        r33 = R[2, 2]
+        r13 = R[0, 2]
         r_23 = R[1, 2]
 
         # solve for theta_4
-        theta4 = np.atan2(-(r_33 * c3 + r_13 * s3) / s5, r_23 / s5)
+        theta4 = np.atan2(r_23, -r33 * c3 - r13 * s3)
         return theta4
 
-    def __solve_theta_5(self, R: np.ndarray, theta3: float) -> tuple[float]:
+    def __solve_theta_5(
+        self, R: np.ndarray, theta3: float, theta4: float
+    ) -> tuple[float]:
         # rename variables for readability
         r13 = R[0, 2]
         r33 = R[2, 2]
         r23 = R[1, 2]
         c3 = np.cos(theta3)
         s3 = np.sin(theta3)
+        s4 = np.sin(theta4)
+        c4 = np.cos(theta4)
 
         # solve for theta_5
-        theta5 = np.atan2(np.sqrt((r33*c3 + r13*s3)**2 + r23**2), r13*c3 - r33*s3)
+        theta5 = np.atan2(r23 * s4 - c3 * c4 * r33 - c4 * r13 * s3, c3 * r13 - r33 * s3)
         return theta5
 
-    def __solve_theta_6(self, R: np.ndarray, theta3: float, theta5: float) -> float:
+    def __solve_theta_6(
+        self, R: np.ndarray, theta3: float, theta4: float, theta5: float
+    ) -> float:
         # rename variables for readability
-        r_12 = R[0, 1]
-        r_32 = R[2, 1]
-        r_11 = R[0, 0]
-        r_31 = R[2, 0]
+        r21 = R[1, 0]
+        r11 = R[0, 0]
+        r31 = R[2, 0]
         s5 = np.sin(theta5)
         c3 = np.cos(theta3)
         s3 = np.sin(theta3)
+        c4 = np.cos(theta4)
+        s4 = np.sin(theta4)
+        c5 = np.cos(theta5)
 
         # solve for theta_6
-        theta6 = np.atan2(-(r_12 * c3 - r_32 * s3) / s5, (r_11 * c3 - r_31 * s3) / s5)
+        theta6 = np.atan2(
+            -c4 * r21 - c3 * r31 * s4 - r11 * s3 * s4,
+            r11 * (c3 * s5 + c4 * c5 * s3)
+            - c5 * r21 * s4
+            - r31 * s3 * s5
+            + c3 * c4 * c5 * r31,
+        )
         return theta6
 
     def solve_ik(self, *args) -> list:
@@ -119,9 +137,9 @@ class IkSolver:
         else:
             raise ValueError("Invalid number of arguments provided.")
 
-        P, R = self.__get_wrist_from_tooltip(P, R)
-        theta3 = self.__solve_theta3(P)
-        theta5 = self.__solve_theta_5(R, theta3)
-        theta4 = self.__solve_theta_4(R, theta3, theta5)
-        theta6 = self.__solve_theta_6(R, theta3, theta5)
+        # P, R = self.__get_wrist_from_tooltip(P, R)
+        theta3 = self.__solve_theta3(P, R)
+        theta4 = self.__solve_theta_4(R, theta3)
+        theta5 = self.__solve_theta_5(R, theta3, theta4)
+        theta6 = self.__solve_theta_6(R, theta3, theta4, theta5)
         return [theta3, theta4, theta5, theta6]

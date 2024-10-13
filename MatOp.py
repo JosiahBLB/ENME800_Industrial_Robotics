@@ -4,7 +4,7 @@ import numpy as np
 class MatOp:
 
     @staticmethod
-    def zyx_rotation_matrix(cls, alpha, beta, gamma):
+    def zyx_rotation_matrix(alpha, beta, gamma):
         ca = np.cos(alpha)
         sa = np.sin(alpha)
         cb = np.cos(beta)
